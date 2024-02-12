@@ -1,16 +1,22 @@
 {
-  "dependencies": {
-    "gitignore": "^0.7.0",
-    "sqlite3": "^5.1.7"
-  },
   "name": "mapaturystyczna",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "author": "",
   "license": "ISC",
-  "devDependencies": {},
-  "description": ""
+  "description": "",
+  "scripts": {
+    "dev": "ts-node src/app.ts",
+    "start": "tsc && node dist/app.js",
+    "buildProd": "tsc -p ."
+  },
+  "dependencies": {
+    "gitignore": "^0.7.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "typescript": "^5.3.3"
+  }
 }
