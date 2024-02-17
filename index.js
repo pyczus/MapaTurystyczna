@@ -3,20 +3,20 @@ const db = new sqlite3.Database('routes.db');
 
 const fs = require('fs')
 
-db.serialize(() => {
-	console.log('Script started...');
-	var lines = ''
-    db.each("SELECT 'AddPolyline(''' ||  polyline || ''',''' || color || ''',''' || opis || ''')'  as line FROM trasa", (err, row) => {
-        lines += row.line + '\n'
+var lines = "drawPolylines = function(map) {\n";
+
+db.all("SELECT * FROM trasa", function(_, rows) {
+    rows.forEach(function (row) {
+        lines += "\tmap.addPolyline('" + row.polyline + "', '" + row.color + "', '" + row.opis + "');\n"
     });
+    lines += "}\n";
 
-	fs.writeFile('routes.js', lines,  function(err) {
-            if (err) {
-                return console.error(err);
-            }
-            console.log('Script finished succesfully.');
-        });
-	
+    fs.writeFile('routes.js', lines,  function(err) {
+        if (err) {
+            return console.error(err);
+        }
+        console.log('Script finished succesfully.');
+    });
+    
 });
-
 db.close();
