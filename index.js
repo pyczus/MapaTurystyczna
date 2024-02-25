@@ -7,7 +7,7 @@ var lines = "drawPolylines = function(map) {\n";
 
 db.all("SELECT * FROM trasa", function(_, rows) {
     rows.forEach(function (row) {
-        lines += "\tmap.addPolyline('" + row.polyline + "', '" + row.color + "', '" + row.opis + "');\n"
+        lines += "\tmap.addPolyline('" + row.polyline.replace(/\\/g, '\\\\') + "', '" + row.color + "', '" + row.opis + "');\n"
     });
     lines += "}\n";
 
