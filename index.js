@@ -9,7 +9,7 @@ db.all("SELECT * FROM trasa INNER JOIN type ON trasa.typ=type.id", function(_, r
     rows.forEach(function (row) {
         lines += "\tmap.addPolyline('" + row.polyline.replace(/\\/g, '\\\\') + "', '" + row.color + "', '" + row.opis + "', " + (row.typ=="piesza" ? "true" : "false") + ");\n"
     });
-    lines += "}\n";
+    lines += "}\r\n";
 
     fs.writeFile('routes.js', lines,  function(err) {
         if (err) {
