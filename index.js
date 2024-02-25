@@ -5,9 +5,9 @@ const fs = require('fs')
 
 var lines = "drawPolylines = function(map) {\n";
 
-db.all("SELECT * FROM trasa", function(_, rows) {
+db.all("SELECT * FROM trasa INNER JOIN type ON trasa.typ=type.id", function(_, rows) {
     rows.forEach(function (row) {
-        lines += "\tmap.addPolyline('" + row.polyline.replace(/\\/g, '\\\\') + "', '" + row.color + "', '" + row.opis + "');\n"
+        lines += "\tmap.addPolyline('" + row.polyline.replace(/\\/g, '\\\\') + "', '" + row.color + "', '" + row.opis + "', " + (row.typ=="piesza" ? "true" : "false") + ");\n"
     });
     lines += "}\n";
 
