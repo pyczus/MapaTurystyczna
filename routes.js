@@ -1,4 +1,4 @@
-drawPolylines = function(map) {
+drawPolylines = function (map) {
 	map.addPolyline('{xgnHapetBxBe@VrBnDCxDeEf[kFaA`I?pCU|AzDdHfAqBdAd@t@FTa@lB{BxBe@fA}DlAm@zF|C`I~Ej@{@Zz@|DaLzMhUHxAv@~@f@k@g@j@w@_AGyA}MgU]qCiBsJYcKSkDgEa@DkD', '#ffff00', 'Żywiec żółty', true);
 	map.addPolyline('cognHceetBBiG~DoEf[kFaA`I?pCU|AzDdHfAqBdAd@t@FTa@lB{BxBe@fA}DlAm@zF|C`I~Ej@{@Zz@|DaLzMhUHxAv@~@f@k@vDeA', '#0000ff', 'Żywiec niebieski', true);
 	map.addPolyline('{xgnHapetBxBe@VrBnDCxDeEf[kFrDoS', '#00ff00', 'Żywiec zielony', true);
