@@ -1,0 +1,388 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+  <title>Distance calculator</title>
+  <style type="text/css" media="screen">
+    html, body {
+      margin:0;
+      padding:0;
+      height:100%;
+    }
+    #map{
+      width:100%;
+      height:100%;
+    }
+    .addpoint{
+      cursor:crosshair;
+    }
+    .noadd,
+    .wml-zoom-slider{
+      cursor:default;
+    }
+  </style>
+  <script>
+      (function(){
+          var search = location.search.slice(1);
+          if (search) {
+              search = search.split('&');
+              var params = {};
+              for (var i = 0; i < search.length; i++) {
+                  var p = search[i].split('=');
+                  params[p[0]] = p[1];
+              }
+              if (params['lng'] !== params['lon']) {
+                  if (params['lng']) params.lon = params.lng;
+                  var url = '/?lon=' + params.lon + '&lng=' + params.lon;
+                  if (params.lat) url += '&lat=' + params.lat;
+                  if (params.zoom) url += '&zoom=' + params.zoom;
+                  if (params.layer) url += '&layer=' + params.layer;
+                  if (window.history && history.replaceState) {
+                      history.replaceState({}, document.title, url);
+                  }
+              }
+          }
+      })();
+  </script>
+  <script type="text/javascript" src="showsave.js"></script>
+</head>
+<body onkeydown="key(event)" onkeyup="key(event)" >
+    <div id="map" class="addpoint"></div>
+    <iframe width="0" height="0" style="display:none" id="josm_frame"></iframe>
+  <script type="text/javascript" src="wml/web-maps-lite.js"></script>
+  <script type="text/javascript">
+    function hasClass(ele,cls) {
+        return ele.className.match(new RegExp('(\\s|^)'+cls+'(\\s|$)'));
+    }
+
+    function addClass(ele,cls) {
+        if (!this.hasClass(ele,cls)) ele.className += " "+cls;
+    }
+
+    function removeClass(ele,cls) {
+        if (hasClass(ele,cls)) {
+        var reg = new RegExp('(\\s|^)'+cls+'(\\s|$)');
+            ele.className=ele.className.replace(reg,' ');
+        }
+    }
+
+    function error_route(e){
+        alert('Unable to find a route:'+e);
+    }
+    function route_loaded(){
+        var route = directions.getRoute(0);
+        var desc='';
+        for (var x = 0; x< route.getNumSteps(); x++){
+            desc += route.getStep(x).getDescriptionHtml()+'\\n--\\n';
+        }
+        alert(desc);
+    }
+    function route() {
+        if (polygon === undefined) return;
+        var x = 0;
+        var point;
+        var points = new Array();
+        while ((point=polygon.getVertex(x))!== undefined){
+            points.push(point);
+            x++;
+        }
+        directions.loadFromWaypoints(points, {travelMode: 'car',preserveViewport:true,lang:'fr'},document.getElementById('dev'));
+        CM.Event.removeListener(directions, 'load', route_loaded);
+        CM.Event.addListener(directions, 'load', route_loaded);
+        CM.Event.removeListener(directions, 'error', error_route);
+        CM.Event.addListener(directions, 'error', error_route);
+    }
+    var supprMode=false;
+    var supprMarkers=new Array();
+
+    function suppr(latlng){
+        if(polygon !== undefined){
+            var x=0;
+            var point;
+            while ((point=polygon.getVertex(x))!== undefined){
+                if (point.equals(latlng)){
+                    polygon.deleteVertex(x);
+                    break;
+                }
+                x++;
+            }
+        }
+        for (x in supprMarkers){
+            if (supprMarkers[x].getLatLng().equals(latlng)){
+                supprMarkers[x].hide();
+                CM.Event.removeListener(supprMarkers[x], 'click', suppr);
+                break;
+            }
+        }
+    }
+function export_(format){
+    var points = getPoints();
+    var file = '';
+    var mime = '';
+    switch(format) {
+        case 'gpx':
+            mime = 'application/gpx+xml';
+            file = '<?xml version="1.0" encoding="iso-8859-1" ?>\n' +
+                '<gpx\n' +
+                '     xmlns="http://www.topografix.com/GPX/1/1"\n' +
+                '     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n' +
+                '     xsi:schemaLocation="http://www.topografix.com/GPX/1/1http://www.topografix.com/GPX/1/1/gpx.xsd"\n' +
+                '     version="1.1"\n' +
+                '     creator="http://map.meurisse.org/">\n' +
+                '<trk><trkseg>\n';
+            for (var i = 0; i < points.length; i++) {
+                file += '<trkpt lat="' + points[i][0] + '" lon="' + points[i][1] + '"></trkpt>\n';
+            }
+            file += '</trkseg></trk>\n</gpx>';
+            break;
+        case 'csv':
+            mime = 'text/csv';
+            for (var i = 0; i < points.length; i++) {
+                file += points[i][0] + ',' + points[i][1] + '\n';
+            }
+            break;
+        case 'kml':
+            mime = 'application/vnd.google-earth.kml+xml';
+            file = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+                   '<kml xmlns="http://www.opengis.net/kml/2.2">\n' +
+                   '<Placemark>\n' +
+                   '<LineString>\n' +
+                   '<altitudeMode>relativeToGround</altitudeMode>\n' +
+                   '<coordinates>\n';
+            for (var i = 0; i < points.length; i++) {
+                file += points[i][1] + ',' + points[i][0] + ',5\n';
+            }
+
+            file += ' </coordinates>\n' +
+                    '</LineString>\n' +
+                    '</Placemark>\n' +
+                    '</kml>';
+            break;
+    }
+    showSave(file, 'export.' + format, mime);
+}
+    function josm(){
+        var bounds = map.getBounds();
+        var url = 'http://localhost:8111/load_and_zoom'
+            +'?left='+bounds.getSouthWest().lng().toString()
+            +'&right='+bounds.getNorthEast().lng().toString()
+            +'&top='+bounds.getNorthEast().lat().toString()
+            +'&bottom='+bounds.getSouthWest().lat().toString();
+        var frame = document.getElementById("josm_frame");
+        frame.src = url;
+    }
+    function key(e){
+        var evtobj=window.event? event : e //distinguish between IE's explicit event object (window.event) and Firefox's implicit.
+        var unicode=evtobj.charCode? evtobj.charCode : evtobj.keyCode
+        if (evtobj.type=='keydown'){
+            if (unicode===67) export_("csv");//C
+            if (unicode===71) export_("gpx");//G
+            if (unicode===73) map.openInfoWindow(map.getCenter(), 'test');//I
+            if (unicode===74) josm();//J
+            if (unicode===75) export_("kml");//K
+            if (unicode===82) route();//R
+            if (unicode===17 || unicode===88 || unicode===18 || unicode===224){//Ctrl,X,Alt,Pomme
+                if(supprMode) return;
+                if(polygon !== undefined){
+                    supprMode=true;
+                    polygon.disableEditing();
+                    removeClass(document.getElementById('map'), 'addpoint');
+                    CM.Event.removeListener(map, 'click', addpoint);
+                    CM.Event.removeListener(polygon, 'click', addpoint);
+                    var x=0;
+                    var point;
+                    while ((point=polygon.getVertex(x))!== undefined){
+                        var marker=new CM.Marker(point,{icon: removeIcon});
+                        map.addOverlay(marker);
+                        supprMarkers.push(marker);
+                        CM.Event.addListener(marker, 'click', suppr);
+                        x++;
+                    }
+                }
+            }
+        }else{
+            if(!supprMode) return;
+            supprMode=false;
+            for (x in supprMarkers) map.removeOverlay(supprMarkers[x]);
+            supprMarkers=new Array();
+            if(polygon !== undefined){
+                polygon.enableEditing();
+                CM.Event.addListener(polygon, 'click', addpoint);
+            }
+            CM.Event.addListener(map, 'click', addpoint);
+            addClass(document.getElementById('map'), 'addpoint');
+        }
+    }
+    function autoZoom(){
+        if(polygon !== undefined){
+            map.zoomToBounds(polygon.getBounds());
+        }
+    }
+    function getPoints(){
+        var points = [];
+        if(polygon !== undefined){
+            var x=0;
+            var point;
+            while ((point=polygon.getVertex(x))!== undefined){
+                points.push([point.lat(), point.lng()]);
+                x++;
+            }
+        }
+        return points;
+    }
+    function clear(){
+        document.getElementById('clear').innerHTML='  ';
+        displayDistance(0);
+        polygon.disableEditing();
+        map.removeOverlay(polygon);
+        polygon = undefined;
+    }
+    EarthRadiusInMiles = 3956.0;
+    EarthRadiusInKilometers = 6367.0;
+    kmToMiles = 0.621371192;
+    function CalcDistance(lat1, lng1, lat2, lng2, radius) { 
+        return radius * 2 * Math.asin( Math.min(1, Math.sqrt( ( Math.pow(Math.sin( (lat2 - lat1) / 2.0), 2.0) + Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lng2 - lng1) / 2.0), 2.0) ) ) ) );
+    };
+
+    function distVincenty(lat1, lon1, lat2, lon2) {
+        /*http://www.movable-type.co.uk/scripts/latlong-vincenty.html*/
+        var a = 6378137, b = 6356752.3142,  f = 1/298.257223563;  // WGS-84 ellipsiod
+        var L = lon2-lon1;
+        var U1 = Math.atan((1-f) * Math.tan(lat1));
+        var U2 = Math.atan((1-f) * Math.tan(lat2));
+        var sinU1 = Math.sin(U1), cosU1 = Math.cos(U1);
+        var sinU2 = Math.sin(U2), cosU2 = Math.cos(U2);
+  
+        var lambda = L, lambdaP, iterLimit = 100;
+        do {
+            var sinLambda = Math.sin(lambda), cosLambda = Math.cos(lambda);
+            var sinSigma = Math.sqrt((cosU2*sinLambda) * (cosU2*sinLambda) + 
+                (cosU1*sinU2-sinU1*cosU2*cosLambda) * (cosU1*sinU2-sinU1*cosU2*cosLambda));
+            if (sinSigma==0) return 0;  // co-incident points
+            var cosSigma = sinU1*sinU2 + cosU1*cosU2*cosLambda;
+            var sigma = Math.atan2(sinSigma, cosSigma);
+            var sinAlpha = cosU1 * cosU2 * sinLambda / sinSigma;
+            var cosSqAlpha = 1 - sinAlpha*sinAlpha;
+            var cos2SigmaM = cosSigma - 2*sinU1*sinU2/cosSqAlpha;
+            if (isNaN(cos2SigmaM)) cos2SigmaM = 0;  // equatorial line: cosSqAlpha=0 (§6)
+            var C = f/16*cosSqAlpha*(4+f*(4-3*cosSqAlpha));
+            lambdaP = lambda;
+            lambda = L + (1-C) * f * sinAlpha *
+                (sigma + C*sinSigma*(cos2SigmaM+C*cosSigma*(-1+2*cos2SigmaM*cos2SigmaM)));
+        } while (Math.abs(lambda-lambdaP) > 1e-12 && --iterLimit>0);
+
+        if (iterLimit==0) return NaN  // formula failed to converge
+
+        var uSq = cosSqAlpha * (a*a - b*b) / (b*b);
+        var A = 1 + uSq/16384*(4096+uSq*(-768+uSq*(320-175*uSq)));
+        var B = uSq/1024 * (256+uSq*(-128+uSq*(74-47*uSq)));
+        var deltaSigma = B*sinSigma*(cos2SigmaM+B/4*(cosSigma*(-1+2*cos2SigmaM*cos2SigmaM)-
+            B/6*cos2SigmaM*(-3+4*sinSigma*sinSigma)*(-3+4*cos2SigmaM*cos2SigmaM)));
+        var s = b*A*(sigma-deltaSigma);
+  
+        return s;
+    }
+
+
+    CM.Tiles.OpenStreetMap.MISSING_TILE_URL = '/404.png';
+    var mapnik = new CM.Tiles.OpenStreetMap.Mapnik({ tileUrlTemplate: 'https://#{subdomain}.tile.openstreetmap.org/#{zoom}/#{x}/#{y}.png' });
+    //var cycle = new CM.Tiles.OpenStreetMap.Cycle();
+    //var osma = new CM.Tiles.OpenStreetMap.Osmarender();
+    //var cloudmade = new CM.Tiles.CloudMade.Web({key: '602ac514b23350babc034633e5edd323'});
+    //var cloudmadem = new CM.Tiles.CloudMade.Mobile({key: '602ac514b23350babc034633e5edd323'});
+    var map = new CM.Map('map', [mapnik]);
+    map.addControl(new CM.LargeMapControl());
+    map.addControl(new CM.ScaleControl());
+    //map.addControl(new CM.TileLayerControl());
+    map.addControl(new CM.PermalinkControl());
+    var MyCustomControl = function() {};
+
+    MyCustomControl.prototype = {
+        initialize: function(map) {
+            var container = document.createElement('div');
+            container.style.fontSize = '1.4em';
+            container.style.lineHeight = '1.5em';
+            container.style.backgroundColor = 'white';
+            container.style.padding = '5px';
+            container.style.border = '1px solid #ccc';
+            container.innerHTML = '<div id="distance" class="noadd"></div>'
+            container.innerHTML += '<div><a href="#" onclick="return false" id="zoom" >Zoom to path</a></div>'
+            container.innerHTML += '<div id="clear" ></div>';
+            if (window.showSave) {
+                container.innerHTML += '<div id="export">Export: <a href="#" onclick="return false" id="csv" >csv</a>. <a href="#" onclick="return false" id="gpx" >gpx</a>. <a href="#" onclick="return false" id="kml" >kml</a></div>'
+            } else {
+                container.innerHTML += '<div id="export">Export: Sorry, you need a recent browser</div>';
+            }
+            container.innerHTML += '<div id="dev" ></div>'
+            map.getContainer().appendChild(container);
+            displayDistance(0);
+            return container;
+        },
+
+        getDefaultPosition: function() {
+            return new CM.ControlPosition(CM.TOP_LEFT, new CM.Size(60, 10));
+        }
+    }
+    map.addControl(new MyCustomControl());
+    var directions = new CM.Directions(map, null, '602ac514b23350babc034633e5edd323');
+    function menulink(id, call){
+        CM.DomEvent.addListener(document.getElementById(id), 'click', function(e) {
+            CM.DomEvent.preventDefault(e);
+            CM.DomEvent.stopPropagation(e);
+            call();
+        });
+    }
+    menulink('zoom', autoZoom);
+    if (window.showSave) {
+        menulink('csv', function(){export_('csv');});
+        menulink('gpx', function(){export_('gpx');});
+        menulink('kml', function(){export_('kml');});
+    }
+    
+
+    map.setCenter(new CM.LatLng(47.33, 2.52), 7);
+    map.checkResize();	
+    map.disableDoubleClickZoom();
+    var removeIcon = new CM.Icon();
+    removeIcon.image = "remove.png";
+    removeIcon.iconSize = new CM.Size(32, 32);
+    var polygon;
+
+    function addpoint(latlng) {
+        if (polygon===undefined){
+            polygon = new CM.Polyline([latlng]);
+            map.addOverlay(polygon);
+	        CM.Event.addListener(polygon, 'lineupdated', function() {
+                var x=0;
+                var distance=0;
+                var distance2=0;
+                var point;
+                var lastpoint;
+                while ((point=polygon.getVertex(x))!== undefined){
+                    if (lastpoint!==undefined){
+                        //distance += CalcDistance(lastpoint.latRadians(),lastpoint.lngRadians(),point.latRadians(),point.lngRadians(),EarthRadiusInKilometers);
+                        distance2 += distVincenty(lastpoint.latRadians(),lastpoint.lngRadians(),point.latRadians(),point.lngRadians())/ 1000;
+                    }
+                    lastpoint = point;
+                    x++;
+                }
+                displayDistance(distance2);
+            });
+            document.getElementById('clear').innerHTML = '<a href="javascript:clear()">Clear</a>'
+            polygon.enableEditing();
+            CM.Event.addListener(polygon, 'click', addpoint);
+        }else{
+//            latlng = new CM.LatLng(latlng.lat(), latlng.lng() + 360, true);
+            polygon.insertVertex(999999, latlng);//999999 is to ensure the add at the end of the polygon
+            polygon.disableEditing();
+            polygon.enableEditing();
+        }
+    };
+    function displayDistance(distance2) {
+        document.getElementById('distance').innerHTML = 'Total distance: '+ distance2.toFixed(3) +'km<br/><span style="visibility:hidden">Total distance: </span>' + (distance2 * kmToMiles).toFixed(3) + 'mi';
+    }
+    CM.Event.addListener(map, 'click', addpoint);
+  </script>
+
+
+</body>
+</html>
